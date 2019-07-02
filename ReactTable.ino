@@ -9,25 +9,12 @@
 enum Mode { SolidMode, ConfettiMode, GearMode, FireMode };
 
 // -- Mode choice
-Mode g_Mode = SolidMode;
+Mode g_Mode = ConfettiMode;
 
 // -- To cycle modes, set cycle to true and choose an interval (in milliseconds)
 bool g_Cycle = false;
 const int TIME_PER_PATTERN = 15000;
 
-// === One-cell pin settings ================================================
-
-/** One cell mode
- *  
- *  If you only have one cell, then you only need two pins: one pin to read 
- *  the IR analog input and one pin to drive the LED ring. You can ignore the
- *  rest of the configuration.
- */
-
- #define ONE_CELL_MODE true
-
- #define IR_INPUT_PIN 27
- #define LED_PIN 26
 
  // === Multi-cell pin settings ==============================================
 
@@ -58,21 +45,17 @@ const int TIME_PER_PATTERN = 15000;
  * that to the channel selectors (above). Then we read in the input on
  * the pin specified by the next two bits of the input.
  */
-int IR_INPUTS[] = { 27, 33, 34, 35 };
+int IR_INPUTS[] = { 34, 35 };
 
 /** Cell configuration
  *
  * My table has 61 cells, with 12 WS2812 LEDs per cell. The LEDs are
  * chained together to form a single, logical strip.
  */
-#ifdef ONE_CELL_MODE
-#define NUM_CELLS 1
-#else
-#define NUM_CELLS 61
-#endif
+ 
 
+int const NUM_CELLS=32;
 #define LEDS_PER_CELL 12
-#define NUM_LEDS (NUM_CELLS * LEDS_PER_CELL)
 
 /** LED strip configuration 
  *
@@ -82,13 +65,15 @@ int IR_INPUTS[] = { 27, 33, 34, 35 };
  * 
  */
 #define LED_PIN_1 26
-#define NUM_LEDS_1 (22 * LEDS_PER_CELL)
+#define NUM_LEDS_1 (11 * LEDS_PER_CELL)
 
 #define LED_PIN_2 16
-#define NUM_LEDS_2 (22 * LEDS_PER_CELL)
+#define NUM_LEDS_2 (10 * LEDS_PER_CELL)
 
 #define LED_PIN_3  4
-#define NUM_LEDS_3 (17 * LEDS_PER_CELL)
+#define NUM_LEDS_3 (11 * LEDS_PER_CELL)
+
+#define NUM_LEDS    (NUM_LEDS_1+NUM_LEDS_2+NUM_LEDS_3)
 
 /** Default brightness */
 uint8_t g_Brightness = 60;
@@ -126,17 +111,12 @@ struct CellMapEntry
 };
 
 CellMapEntry g_CellMap[] = {
-    {  0, 60, 0, 0 }, {  1, 49, 2, 0 }, {  2, 38, 4, 0 }, {  3, 27, 6, 0 }, {  4, 16, 8, 0 }, {  5, 5, 10, 0 },
-    {  6, 54, 1, 1 }, {  7, 43, 3, 1 }, {  8, 32, 5, 1 }, {  9, 21, 7, 1 }, { 10, 10, 9, 1 },
-    { 11, 59, 0, 2 }, { 12, 48, 2, 2 }, { 13, 37, 4, 2 }, { 14, 26, 6, 2 }, { 15, 15, 8, 2 }, { 16, 4, 10, 2 },
-    { 17, 53, 1, 3 }, { 18, 42, 3, 3 }, { 19, 31, 5, 3 }, { 20, 20, 7, 3 }, { 21,  9, 9, 3 },
-    { 22, 58, 0, 4 }, { 23, 47, 2, 4 }, { 24, 36, 4, 4 }, { 25, 25, 6, 4 }, { 26, 14, 8, 4 }, { 27, 3, 10, 4 },
-    { 28, 52, 1, 5 }, { 29, 41, 3, 5 }, { 30, 30, 5, 5 }, { 31, 19, 7, 5 }, { 32,  8, 9, 5 },
-    { 33, 57, 0, 6 }, { 34, 46, 2, 6 }, { 35, 35, 4, 6 }, { 36, 24, 6, 6 }, { 37, 13, 8, 6 }, { 38, 2, 10, 6 },
-    { 39, 51, 1, 7 }, { 40, 40, 3, 7 }, { 41, 29, 5, 7 }, { 42, 18, 7, 7 }, { 43,  7, 9, 7 },
-    { 44, 56, 0, 8 }, { 45, 45, 2, 8 }, { 46, 34, 4, 8 }, { 47, 23, 6, 8 }, { 48, 12, 8, 8 }, { 49, 1, 10, 8 },
-    { 50, 50, 1, 9 }, { 51, 39, 3, 9 }, { 52, 28, 5, 9 }, { 53, 17, 7, 9 }, { 54,  6, 9, 9 },
-    { 55, 55, 0, 10}, { 56, 44, 2, 10}, { 57, 33, 4, 10}, { 58, 22, 6, 10}, { 59, 11, 8, 10}, { 60, 0, 10, 10 }
+    {  0, 0, 0, 0 }, {  1, 1, 2, 0 }, {  2, 2, 4, 0 }, {  3, 3, 6, 0 }, {  4, 4, 8, 0 }, {  5, 5, 10, 0 },
+    {  6, 6, 1, 1 }, {  7, 7, 3, 1 }, {  8, 8, 5, 1 }, {  9, 9, 7, 1 }, { 10, 10, 9, 1 },
+    { 11, 11, 0, 2 }, { 12, 12, 2, 2 }, { 13, 13, 4, 2 }, { 14, 14, 6, 2 }, { 15, 15, 8, 2 }, { 16, 16, 10, 2 },
+    { 17, 17, 1, 3 }, { 18, 18, 3, 3 }, { 19, 19, 5, 3 }, { 20, 20, 7, 3 }, { 21,  21, 9, 3 },
+    { 22, 22, 0, 4 }, { 23, 23, 2, 4 }, { 24, 24, 4, 4 }, { 25, 25, 6, 4 }, { 26, 26, 8, 4 }, { 27, 27, 10, 4 },
+    { 28, 28, 1, 5 }, { 29, 29, 3, 5 }, { 30, 30, 5, 5 }, { 31, 31, 7, 5 }
 };
 
 // === Single surface view ==================================================
@@ -311,9 +291,7 @@ public:
     {
         uint16_t val;
         
-        if (ONE_CELL_MODE) {
-            val = analogRead(IR_INPUT_PIN);
-        } else {
+
             // -- Select the channel
             digitalWrite(IR_CHANNEL_BIT_0, m_ir_channel_selector[0]);
             digitalWrite(IR_CHANNEL_BIT_1, m_ir_channel_selector[1]);
@@ -322,7 +300,6 @@ public:
 
             // -- Finally, read the analog value
             val = analogRead(IR_INPUTS[m_ir_input]);
-        }
         
         return val;
     }
@@ -835,14 +812,11 @@ void calibrate()
 void initialize()
 {
     // -- Create all the cell objects
-    if (ONE_CELL_MODE) {
-        CellMapEntry one = {0, 0, 0, 0};
-        g_Cells[0] = new Cell(one);
-    } else {
+
         for (int i = 0; i < NUM_CELLS; i++) {
             g_Cells[i] = new Cell(g_CellMap[i]);
         }
-    }
+    
     
     // -- Calibrate the IR sensors
     calibrate();
@@ -870,10 +844,7 @@ void setup()
     delay(500);
 
     // -- Set up the pins
-    if (ONE_CELL_MODE) {
-        pinMode(LED_PIN, OUTPUT);
-        pinMode(IR_INPUT_PIN, INPUT);
-    } else {
+
         pinMode(LED_PIN_1, OUTPUT);
         pinMode(LED_PIN_2, OUTPUT);
         pinMode(LED_PIN_3, OUTPUT);
@@ -886,21 +857,21 @@ void setup()
         pinMode(IR_CHANNEL_BIT_1, OUTPUT);
         pinMode(IR_CHANNEL_BIT_2, OUTPUT);
         pinMode(IR_CHANNEL_BIT_3, OUTPUT);
-    }
+    
 
     Serial.begin(115200);
     delay(200);
 
     // -- Add all the LEDs
-    if (ONE_CELL_MODE) {
-        FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(g_LEDs, NUM_LEDS).setCorrection( TypicalLEDStrip );
-    } else {
-        FastLED.addLeds<CHIPSET, LED_PIN_1, COLOR_ORDER>(g_LEDs, NUM_LEDS_1).setCorrection( TypicalLEDStrip );
-        FastLED.addLeds<CHIPSET, LED_PIN_3, COLOR_ORDER>(g_LEDs, NUM_LEDS_1 + NUM_LEDS_2, NUM_LEDS_3).setCorrection( TypicalLEDStrip );
-        FastLED.addLeds<CHIPSET, LED_PIN_2, COLOR_ORDER>(g_LEDs, NUM_LEDS_1, NUM_LEDS_2).setCorrection( TypicalLEDStrip );
-    }
+
+        FastLED.addLeds<CHIPSET, LED_PIN_1, COLOR_ORDER>(g_LEDs, 0, NUM_LEDS_1).setCorrection( TypicalLEDStrip );
+        FastLED.addLeds<CHIPSET, LED_PIN_3, COLOR_ORDER>(g_LEDs, NUM_LEDS_1, NUM_LEDS_2).setCorrection( TypicalLEDStrip );
+        FastLED.addLeds<CHIPSET, LED_PIN_2, COLOR_ORDER>(g_LEDs, NUM_LEDS_1 + NUM_LEDS_2, NUM_LEDS_3).setCorrection( TypicalLEDStrip );
+    
+
     
     FastLED.setBrightness(g_Brightness);
+    FastLED.setMaxPowerInVoltsAndMilliamps(5,4000); //4 Amp PSU limit
 
     // -- Initialize the cells and calibrate
     
@@ -929,6 +900,7 @@ void loop()
 
     // -- Sense the IR and render the pattern
     for (int i = 0; i < NUM_CELLS; i++) {
+
         if (g_Mode == SolidMode)    g_Cells[i]->SolidPattern();
         if (g_Mode == ConfettiMode) g_Cells[i]->ConfettiPattern();
         if (g_Mode == GearMode)     g_Cells[i]->GearPattern(400, 8000);
@@ -965,4 +937,3 @@ void loop()
 
     delay(1000/FRAMES_PER_SECOND);
 }
-
