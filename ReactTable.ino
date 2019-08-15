@@ -9,7 +9,7 @@
 enum Mode { SolidMode, ConfettiMode, GearMode, FireMode };
 
 // -- Mode choice
-Mode g_Mode = GearMode;
+Mode g_Mode = FireMode;
 
 // -- To cycle modes, set cycle to true and choose an interval (in milliseconds)
 bool g_Cycle = false;
@@ -111,12 +111,9 @@ struct CellMapEntry
 };
 
 CellMapEntry g_CellMap[] = {
-    {  0, 0, 0, 0 }, {  1, 1, 2, 0 }, {  2, 2, 4, 0 }, {  3, 3, 6, 0 }, {  4, 4, 8, 0 }, {  5, 5, 10, 0 },
-    {  6, 6, 1, 1 }, {  7, 7, 3, 1 }, {  8, 8, 5, 1 }, {  9, 9, 7, 1 }, { 10, 10, 9, 1 },
-    { 11, 11, 0, 2 }, { 12, 12, 2, 2 }, { 13, 13, 4, 2 }, { 14, 14, 6, 2 }, { 15, 15, 8, 2 }, { 16, 16, 10, 2 },
-    { 17, 17, 1, 3 }, { 18, 18, 3, 3 }, { 19, 19, 5, 3 }, { 20, 20, 7, 3 }, { 21,  21, 9, 3 },
-    { 22, 22, 0, 4 }, { 23, 23, 2, 4 }, { 24, 24, 4, 4 }, { 25, 25, 6, 4 }, { 26, 26, 8, 4 }, { 27, 27, 10, 4 },
-    { 28, 28, 1, 5 }, { 29, 29, 3, 5 }, { 30, 30, 5, 5 }, { 31, 31, 7, 5 }
+    {  0, 0, 0, 0 }, {  1, 1, 0, 6 }, {  2, 2, 0, 12 }, {  3, 3, 0, 18 }, {  4, 4, 0, 24 }, {  5, 5, 0, 30 },{  6, 6, 0, 36 }, {  7, 7, 0, 42 }, {  8, 8, 0, 48 }, {  9, 9, 0, 54 }, { 10, 10, 0, 60 },
+    { 11, 11, 5, 3 }, { 12, 12, 5, 9 }, { 13, 13, 5, 15 }, { 14, 14, 5, 21 }, { 15, 15, 5, 27 }, { 16, 16, 5, 33 },{ 17, 17, 5, 39 }, { 18, 18, 5, 45 }, { 19, 19, 5, 51}, { 20, 20, 5, 57 },
+    { 21,  21, 10, 0 },{ 22, 22, 10, 6 }, { 23, 23, 10, 12 }, { 24, 24, 10, 18 }, { 25, 25, 10, 24 }, { 26, 26, 10, 30 }, { 27, 27, 10, 36},{ 28, 28, 10, 42 }, { 29, 29, 10, 48 }, { 30, 30, 10, 54 }, { 31, 31, 10, 60 }
 };
 
 // === Single surface view ==================================================
@@ -210,6 +207,10 @@ protected:
     // -- LED ring information
     uint16_t        m_led_index;
     CRGBPalette16   m_palette;
+    uint16_t        m_ring_index;
+
+    // -- neighbours
+    const Cell* m_neighbours[6];
     
     // -- IR sensor
     int             m_ir_input;
@@ -239,7 +240,8 @@ protected:
 
 public:
     Cell( CellMapEntry& info )
-        : m_led_index(info.m_ring_index * LEDS_PER_CELL),
+        : m_ring_index(info.m_ring_index),
+          m_led_index(info.m_ring_index * LEDS_PER_CELL),
           m_palette(RainbowColors_p),
           m_ir_input(info.m_ir_index >> 4),
           m_ir_channel(info.m_ir_index & 0xF),
@@ -261,12 +263,30 @@ public:
         //    coordinates.
         m_surface_x = ((m_ring_x + 1) * SURFACE_WIDTH_SCALE);
         m_surface_y = ((m_ring_y + 1) * SURFACE_HEIGHT_SCALE);
+        for(int i =0; i < 6; ++i){
+          m_neighbours[i] = NULL;  
+        }
     }
 
-    // ----- Getters --------
 
+    void setNeighbour(const Cell * neighbour){
+      for(int i = 0; i < 6; ++i){
+        // Fill up empty slots
+        if (m_neighbours[i] == NULL){
+          m_neighbours[i] = neighbour;
+          break;
+        }
+      }
+    }
+    // ----- Getters --------
+    uint16_t getRingIndex() const {return m_ring_index;}
     uint16_t getRingX() const { return m_ring_x; }
     uint16_t getRingY() const { return m_ring_y; }
+    float distanceTo(const Cell& other){
+      float dx = getRingX() - other.getRingX();
+      float dy = getRingY() - other.getRingY();
+      return std::sqrt(dy * dy + dx * dx);
+    }
     int getSurfaceX() const { return m_surface_x; }
     int getSurfaceY() const { return m_surface_y; }
 
@@ -836,10 +856,20 @@ void initialize()
         for (int i = 0; i < NUM_CELLS; i++) {
             g_Cells[i] = new Cell(g_CellMap[i]);
         }
+
+        for (int i = 0; i < NUM_CELLS; i++) {
+          for(int j = 0; j < NUM_CELLS; j++){
+            if( i == j)
+               continue;
+            if(g_Cells[i]->distanceTo(*g_Cells[j]) < 7.0){
+              g_Cells[i]->setNeighbour(g_Cells[j]);
+             }
+          }
+        }
     
     
     // -- Calibrate the IR sensors
-    //calibrate();
+    calibrate();
 
     // -- Initialize the surface view
     //initializeSurface();
@@ -916,19 +946,21 @@ uint32_t g_frame_count = 0;
 
 void loop()
 {
-    if(g_frame_count % 40 == 0){
-    calibrate_iterative();
-    }
+    //if(g_frame_count % 40 == 0){
+    //calibrate_iterative();
+    //}
     uint32_t start = millis();
 
     // -- Sense the IR and render the pattern
     for (int i = 0; i < NUM_CELLS; i++) {
 
+        
         if (g_Mode == SolidMode)    g_Cells[i]->SolidPattern();
         if (g_Mode == ConfettiMode) g_Cells[i]->ConfettiPattern();
         if (g_Mode == GearMode)     g_Cells[i]->GearPattern(400, 8000);
         if (g_Mode == FireMode)     g_Cells[i]->FirePattern(30, 50);
         // if (g_Mode == SurfaceMode)  g_Cells[i]->SurfacePattern();
+       
     }
 
     if (g_Cycle) {
