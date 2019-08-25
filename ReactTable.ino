@@ -9,7 +9,7 @@
 enum Mode { SolidMode, ConfettiMode, GearMode, FireMode };
 
 // -- Mode choice
-Mode g_Mode = FireMode;
+Mode g_Mode = SolidMode;
 
 // -- To cycle modes, set cycle to true and choose an interval (in milliseconds)
 bool g_Cycle = false;
@@ -219,6 +219,7 @@ protected:
     uint16_t        m_ir_max;
     uint8_t         m_ir_channel_selector[4];
     uint16_t        m_level;
+    mutable uint16_t m_last_ir;
 
     // -- Physical position
     uint8_t         m_ring_x;
@@ -266,6 +267,7 @@ public:
         for(int i =0; i < 6; ++i){
           m_neighbours[i] = NULL;  
         }
+        m_last_ir = 0;
     }
 
 
@@ -279,10 +281,11 @@ public:
       }
     }
     // ----- Getters --------
+    uint16_t getLastIR() const {return m_last_ir;}
     uint16_t getRingIndex() const {return m_ring_index;}
     uint16_t getRingX() const { return m_ring_x; }
     uint16_t getRingY() const { return m_ring_y; }
-    float distanceTo(const Cell& other){
+    float distanceTo(const Cell& other) const{
       float dx = getRingX() - other.getRingX();
       float dy = getRingY() - other.getRingY();
       return std::sqrt(dy * dy + dx * dx);
@@ -307,11 +310,10 @@ public:
      *  We can have several MUXs, each with 16 channels. To read a specific
      *  IR value, we specify which MUX (the "input") and which channel.
      */
-    uint16_t rawIR()
+    uint16_t rawIR() const
     {
         uint16_t val;
-        
-
+       
             // -- Select the channel
             digitalWrite(IR_CHANNEL_BIT_0, m_ir_channel_selector[0]);
             digitalWrite(IR_CHANNEL_BIT_1, m_ir_channel_selector[1]);
@@ -320,6 +322,7 @@ public:
 
             // -- Finally, read the analog value
             val = analogRead(IR_INPUTS[m_ir_input]);
+            m_last_ir = val;
         
         return val;
     }
@@ -327,7 +330,7 @@ public:
     /** Sense IR
      *  Read and map to the calibrated range
      */
-    uint8_t senseIR()
+    uint8_t senseIR() const
     {
         uint16_t val = rawIR();
         
@@ -335,9 +338,38 @@ public:
         if (val < m_ir_min) val = m_ir_min;
         if (val > m_ir_max) val = m_ir_max;
         
+        
+        float additional = 0;
+        float count = 0;
+        for(uint8_t i = 0; i < 6; ++i){
+         if(m_neighbours[i] != NULL){
+           float distance = distanceTo(*m_neighbours[i]);
+           float temp = float(m_neighbours[i]->getLastIR());
+           additional += temp *(1 - (distance/14.0));
+           count++;
+         }
+        }
         // -- Map to 8-bit value
+        //uint8_t level = map(val, m_ir_min, m_ir_max, 0, 255);
+        uint8_t boost = map(float_to_fixed(additional/count), m_ir_min, m_ir_max, 0, 255);
         uint8_t level = map(val, m_ir_min, m_ir_max, 0, 255);
-        return level;
+        if(m_ring_index == 12){
+        
+        Serial.print(m_ir_min);
+        Serial.print("\t");
+        Serial.print(m_ir_max);
+        Serial.print("\t");
+        Serial.print(level);
+        Serial.print("\t");
+        Serial.print(boost);
+        Serial.print("\t");
+        Serial.print("\t");
+        Serial.println(count);
+        //delay(500);
+        
+        }
+        
+        return level-boost;
     }
 
     /** Sense IR with decay 
@@ -869,7 +901,7 @@ void initialize()
     
     
     // -- Calibrate the IR sensors
-    calibrate();
+    // calibrate();
 
     // -- Initialize the surface view
     //initializeSurface();
@@ -946,14 +978,16 @@ uint32_t g_frame_count = 0;
 
 void loop()
 {
-    //if(g_frame_count % 40 == 0){
-    //calibrate_iterative();
-    //}
+    if(g_frame_count % 40 == 0){
+      calibrate_iterative();
+    }
     uint32_t start = millis();
 
     // -- Sense the IR and render the pattern
     for (int i = 0; i < NUM_CELLS; i++) {
 
+        
+        
         
         if (g_Mode == SolidMode)    g_Cells[i]->SolidPattern();
         if (g_Mode == ConfettiMode) g_Cells[i]->ConfettiPattern();
