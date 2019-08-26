@@ -9,7 +9,7 @@
 enum Mode { SolidMode, ConfettiMode, GearMode, FireMode };
 
 // -- Mode choice
-Mode g_Mode = SolidMode;
+Mode g_Mode = GearMode;
 
 // -- To cycle modes, set cycle to true and choose an interval (in milliseconds)
 bool g_Cycle = false;
@@ -312,18 +312,7 @@ public:
     return val;
   }
 
-  /** Sense IR
-   *  Read and map to the calibrated range
-   */
-  uint8_t senseIR() const {
-    uint16_t val = rawIR();
-
-    // -- Pin the value in between the min and max from calibration
-    if (val < m_ir_min)
-      val = m_ir_min;
-    if (val > m_ir_max)
-      val = m_ir_max;
-
+  uint8_t senseBoost() const {
     float additional = 0;
     float count = 0;
     const float neighbour_max = 255;
@@ -343,24 +332,26 @@ public:
       }
     }
     // -- Map to 8-bit value
-    uint8_t level = map(val, m_ir_min, m_ir_max, 0, 255);
-    uint8_t boost = float_to_fixed(additional / count);
-    // uint8_t level = map(val, m_ir_min, m_ir_max, 0, 255);
-    if (m_ring_index == 12) {
+    return float_to_fixed(additional / count);
+  }
 
-      Serial.print(m_ir_min);
-      Serial.print("\t");
-      Serial.print(m_ir_max);
-      Serial.print("\t");
-      Serial.print(level);
-      Serial.print("\t");
-      Serial.print(boost);
-      Serial.print("\t");
-      Serial.println(count);
-      // delay(500);
-    }
-    m_last_ir = level;
-    return level - boost;
+  /** Sense IR
+   *  Read and map to the calibrated range
+   */
+  uint8_t senseIR() const {
+    uint16_t val = rawIR();
+
+    // -- Pin the value in between the min and max from calibration
+    if (val < m_ir_min)
+      val = m_ir_min;
+    if (val > m_ir_max)
+      val = m_ir_max;
+
+    // -- Map to 8-bit value
+    uint8_t level = map(val, m_ir_min, m_ir_max, 0, 255);
+
+    m_last_ir = level; // Record the current level
+    return level - senseBoost();
   }
 
   /** Sense IR with decay
