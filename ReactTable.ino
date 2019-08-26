@@ -301,6 +301,9 @@ public:
     void setIRMax(uint16_t ir_max) {
         m_ir_max = ir_max;
     }
+    uint16_t getIRMax() const {
+      return m_ir_max;
+    }
 
     void setIRMin(uint16_t ir_min) {
         m_ir_min = ir_min;
@@ -322,8 +325,8 @@ public:
 
             // -- Finally, read the analog value
             val = analogRead(IR_INPUTS[m_ir_input]);
-            m_last_ir = val;
-        
+            
+
         return val;
     }
 
@@ -341,18 +344,20 @@ public:
         
         float additional = 0;
         float count = 0;
+        const float neighbour_max = 255;
         for(uint8_t i = 0; i < 6; ++i){
          if(m_neighbours[i] != NULL){
+           float neighbour_level = float(m_neighbours[i]->getLastIR());
+           float factor = neighbour_level - neighbour_max; // this is neighbour_level * (1 - ( neighbour_max / neighbour_level));
            float distance = distanceTo(*m_neighbours[i]);
-           float temp = float(m_neighbours[i]->getLastIR());
-           additional += temp *(1 - (distance/14.0));
+           additional += factor * (1 - (distance/14.0)); // distance between sensors approx 7 cm. 14 cm used as scaling to zero.
            count++;
          }
         }
         // -- Map to 8-bit value
-        //uint8_t level = map(val, m_ir_min, m_ir_max, 0, 255);
-        uint8_t boost = map(float_to_fixed(additional/count), m_ir_min, m_ir_max, 0, 255);
         uint8_t level = map(val, m_ir_min, m_ir_max, 0, 255);
+        uint8_t boost = float_to_fixed(additional/count);
+        //uint8_t level = map(val, m_ir_min, m_ir_max, 0, 255);
         if(m_ring_index == 12){
         
         Serial.print(m_ir_min);
@@ -363,12 +368,11 @@ public:
         Serial.print("\t");
         Serial.print(boost);
         Serial.print("\t");
-        Serial.print("\t");
         Serial.println(count);
         //delay(500);
         
         }
-        
+        m_last_ir = level;
         return level-boost;
     }
 
@@ -494,7 +498,9 @@ public:
             m_new_pattern = false;
         }
         uint8_t level = senseIRwithDecay(12, 4);
-        if (level > 230) level = 230;
+        if (level > 230) {
+           level = 230;
+        }
         setAllLEDsHue(level);
     }
     
