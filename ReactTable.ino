@@ -871,26 +871,30 @@ void calibrate_iterative() {
 
   float min = shadow[0].raw_ir;
   float max = shadow[NUM_CELLS - 1].raw_ir;
+  static size_t NHISTOGRAMS = 10;
   if (min < max) {
     float step = (max - min) / 10;
-    float histograms[11] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-
-    float bottom = min;
-    float top = min + step;
-
-    int i = 0;
-    float current = shadow[i].raw_ir;
-    for (int j = 0; j < 11; ++j) {
-
-      while (current >= bottom && current < top && i < NUM_CELLS) {
-        histograms[j] += 1;
-        ++i;
-        current = shadow[i].raw_ir;
-      }
-
-      bottom = top;
-      top = top + step;
+    float histograms[NHISTOGRAMS];
+    for(auto i = 0; i < NHISTOGRAMS; ++i){
+      histograms[i] = 0;
     }
+
+float bottom = min;
+float top = min + step;
+
+int i = 0;
+float current =  shadow[i++].raw_ir;
+for(int j =0; j < NHISTOGRAMS; ++j){
+  while(current >= bottom && current < top && i <= NUM_CELLS){ 
+    current = shadow[i++].raw_ir;
+    histograms[j] += 1;
+  }
+  if(j == NHISTOGRAMS-1){
+    top = top + 0.0001; // What we are doing here is chaning the top comparitor above to act like current <= top
+  }
+  bottom = top;
+  top = top + step;
+}
 
     for (int i = 0; i < NUM_CELLS; ++i) {
       Serial.print(shadow[i].cell->getRingIndex());
