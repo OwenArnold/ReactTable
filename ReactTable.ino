@@ -116,7 +116,6 @@ CellMapEntry g_CellMap[] = {
     {20, 20, 5, 57},  {21, 21, 10, 0},  {22, 22, 10, 6},  {23, 23, 10, 12},
     {24, 24, 10, 18}, {25, 25, 10, 24}, {26, 26, 10, 30}, {27, 27, 10, 36},
     {28, 28, 10, 42}, {29, 29, 10, 48}, {30, 30, 10, 54}, {31, 31, 10, 60}};
-    
 
 // === Single surface view ==================================================
 
@@ -325,7 +324,7 @@ public:
                                                         // - ( neighbour_max /
                                                         // neighbour_level));
         float distance = distanceTo(*m_neighbours[i]);
-        additional += factor * (1 - (distance / 14.0)); // distance between
+        additional += factor * (1 - (distance / 10.0)); // distance between
                                                         // sensors approx 7 cm.
                                                         // 14 cm used as scaling
                                                         // to zero.
@@ -807,7 +806,6 @@ void ParticleSurface() {}
  */
 void calibrate() {
 
-    
   uint16_t total_ir[NUM_CELLS];
 
   for (int i = 0; i < NUM_CELLS; i++)
@@ -831,16 +829,16 @@ void calibrate() {
   }
 }
 
-int comparitor(const void * a, const void * b){
-  const Cell* aCell = static_cast<const Cell*>(a);
-  const Cell* bCell = static_cast<const Cell*>(b);
+int comparitor(const void *a, const void *b) {
+  const Cell *aCell = static_cast<const Cell *>(a);
+  const Cell *bCell = static_cast<const Cell *>(b);
   return aCell->getLastIR() - bCell->getLastIR();
 }
 
 struct Sortable {
-  Cell* cell;
+  Cell *cell;
   uint16_t raw_ir;
-  Sortable& operator=(const Sortable& other){
+  Sortable &operator=(const Sortable &other) {
     cell = other.cell;
     raw_ir = other.raw_ir;
   }
@@ -848,100 +846,107 @@ struct Sortable {
 
 void calibrate_iterative() {
 
-Sortable shadow[NUM_CELLS];
-for (int i = 0; i < NUM_CELLS; i++) {
+  Sortable shadow[NUM_CELLS];
+  for (int i = 0; i < NUM_CELLS; i++) {
     shadow[i].cell = g_Cells[i];
     shadow[i].raw_ir = g_Cells[i]->rawIR();
     Serial.print(shadow[i].cell->getRingIndex());
     Serial.print("\t");
     Serial.println(shadow[i].raw_ir);
-}
-    
+  }
+
   // order by most intense
-  //qsort(shadow, NUM_CELLS, sizeof(Cell), comparitor);
+  // qsort(shadow, NUM_CELLS, sizeof(Cell), comparitor);
 
   for (int i = 0; i < NUM_CELLS; i++) {
-    for (int j = i+1; j < NUM_CELLS; j++) {
+    for (int j = i + 1; j < NUM_CELLS; j++) {
       Sortable current = shadow[i];
       Sortable other = shadow[j];
-      if(current.raw_ir > other.raw_ir){
+      if (current.raw_ir > other.raw_ir) {
         shadow[i] = other;
         shadow[j] = current;
       }
     }
   }
 
-float min = shadow[0].raw_ir;
-float max = shadow[NUM_CELLS-1].raw_ir;
-if (min < max){
-float step = (max - min) / 10;
-float histograms[11] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  float min = shadow[0].raw_ir;
+  float max = shadow[NUM_CELLS - 1].raw_ir;
+  if (min < max) {
+    float step = (max - min) / 10;
+    float histograms[11] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-float bottom = min;
-float top = min + step;
+    float bottom = min;
+    float top = min + step;
 
-int i = 0;
-float current = shadow[i].raw_ir;
-for(int j =0; j < 11; ++j){
+    int i = 0;
+    float current = shadow[i].raw_ir;
+    for (int j = 0; j < 11; ++j) {
 
-  
-  while(current >= bottom && current < top && i < NUM_CELLS){  
-    histograms[j] += 1;
-    ++i;
-    current = shadow[i].raw_ir;
-  }
- 
-  bottom = top;
-  top = top + step;
-}
+      while (current >= bottom && current < top && i < NUM_CELLS) {
+        histograms[j] += 1;
+        ++i;
+        current = shadow[i].raw_ir;
+      }
 
-for(int i = 0; i < NUM_CELLS; ++i){
-    Serial.print(shadow[i].cell->getRingIndex());
-    Serial.print("\t");
-    Serial.println(shadow[i].raw_ir);
-}
-
-for(int i = 0; i < 11; ++i){
-    Serial.print(i);
-    Serial.print("\t");
-    Serial.print(min + (step* i));
-    Serial.print("\t");
-    Serial.println(histograms[i]);
-}
-
-int count = 0;
-float average = 0;
-for(int i = 10; i >= 0; --i){
-    int h_count =  histograms[i];
-    count += h_count;
-    float b = min + (step * i);
-    average += b *  h_count;
-    if(count > 4){
-       break;
+      bottom = top;
+      top = top + step;
     }
-}
-Serial.print("Background limit: ");
-Serial.println(average/count);
-Serial.print("Count: ");
-Serial.println(count);
-}
 
-  uint16_t total_ir[NUM_CELLS];
+    for (int i = 0; i < NUM_CELLS; ++i) {
+      Serial.print(shadow[i].cell->getRingIndex());
+      Serial.print("\t");
+      Serial.println(shadow[i].raw_ir);
+    }
 
-  for (int i = 0; i < NUM_CELLS; i++)
-    total_ir[i] = 0;
+    for (int i = 0; i < 11; ++i) {
+      Serial.print(i);
+      Serial.print("\t");
+      Serial.print(min + (step * i));
+      Serial.print("\t");
+      Serial.println(histograms[i]);
+    }
 
-  for (int rounds = 0; rounds < 4; rounds++) {
+    int count = 0;
+    float w_sum = 0;
+    for (int i = 10; i >= 0; --i) {
+      int h_count = histograms[i];
+      count += h_count;
+      float t = min + (step * (i+1));
+      w_sum += t * h_count;
+      if (count > 5) {
+        break;
+      }
+    }
+    Serial.print("Background limit: ");
+    Serial.println(w_sum / count);
+    Serial.print("Count: ");
+    Serial.println(count);
     for (int i = 0; i < NUM_CELLS; i++) {
-      uint16_t raw = g_Cells[i]->rawIR();
-      total_ir[i] += raw;
+      g_Cells[i]->setIRMax(w_sum / count);
+      g_Cells[i]->setIRMin(140);
     }
-    delay(10);
-  }
+  } else {
+    uint16_t total_ir[NUM_CELLS];
+    for (int i = 0; i < NUM_CELLS; i++)
+      total_ir[i] = 0;
 
-  for (int i = 0; i < NUM_CELLS; i++) {
-    g_Cells[i]->setIRMax(total_ir[i] / 4);
-    g_Cells[i]->setIRMin(140);
+    for (int rounds = 0; rounds < 4; rounds++) {
+      for (int i = 0; i < NUM_CELLS; i++) {
+        uint16_t raw = g_Cells[i]->rawIR();
+        total_ir[i] += raw;
+      }
+      delay(10);
+    }
+    for (int i = 0; i < NUM_CELLS; i++) {
+      g_Cells[i]->setIRMax(total_ir[i] / 4);
+      if(i == 12) {
+         Serial.println("Max index 12: ");
+         Serial.println(total_ir[i] / 4); }
+      if(i == 10) {
+         Serial.println("Max index 10: ");
+         Serial.println(total_ir[i] / 4); }
+      g_Cells[i]->setIRMin(140);
+    }
   }
 }
 
@@ -988,7 +993,6 @@ void setup() {
   pinMode(LED_PIN_1, OUTPUT);
   pinMode(LED_PIN_2, OUTPUT);
   pinMode(LED_PIN_3, OUTPUT);
-  
 
   for (int i = 0; i < 4; i++) {
     pinMode(IR_INPUTS[i], INPUT);
@@ -1017,7 +1021,6 @@ void setup() {
   FastLED.setBrightness(g_Brightness);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 4000); // 4 Amp PSU limit
 
-  
   fill_solid(g_LEDs, NUM_LEDS, CRGB::Yellow);
   FastLED.show();
   delay(1000);
