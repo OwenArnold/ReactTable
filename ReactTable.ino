@@ -871,30 +871,42 @@ void calibrate_iterative() {
 
   float min = shadow[0].raw_ir;
   float max = shadow[NUM_CELLS - 1].raw_ir;
-  static size_t NHISTOGRAMS = 10;
+  const static uint8_t NHISTOGRAMS =
+      10; // How many steps made between min and max readings
+  const static uint8_t REQUIRED_COUNT =
+      5; // How many detectors must be used to calculate background
   if (min < max) {
     float step = (max - min) / 10;
     float histograms[NHISTOGRAMS];
-    for(auto i = 0; i < NHISTOGRAMS; ++i){
+    for (auto i = 0; i < NHISTOGRAMS; ++i) {
       histograms[i] = 0;
     }
 
-float bottom = min;
-float top = min + step;
+    float bottom = min;
+    float top = min + step;
+    int i = 0;
+    float current = shadow[i++].raw_ir;
+    auto less_than = [](const float &current, const float &limit) {
+      return current < limit;
+    }; // Generally upper edge is not inclusive
+    auto less_than_equal_to = [](const float &current, const float &limit) {
+      return current <= limit;
+    }; // On last bin edge, include those on boundary!
+    typedef bool (*Top_Rule)(const float &, const float &);
+    Top_Rule top_rule = less_than;
 
-int i = 0;
-float current =  shadow[i++].raw_ir;
-for(int j =0; j < NHISTOGRAMS; ++j){
-  while(current >= bottom && current < top && i <= NUM_CELLS){ 
-    current = shadow[i++].raw_ir;
-    histograms[j] += 1;
-  }
-  if(j == NHISTOGRAMS-1){
-    top = top + 0.0001; // What we are doing here is chaning the top comparitor above to act like current <= top
-  }
-  bottom = top;
-  top = top + step;
-}
+    for (int j = 0; j < NHISTOGRAMS; ++j) {
+      if (j == NHISTOGRAMS - 1) {
+        top_rule = less_than_equal_to;
+      }
+      while (current >= bottom && top_rule(current, top) && i <= NUM_CELLS) {
+        current = shadow[i++].raw_ir;
+        histograms[j] += 1;
+      }
+
+      bottom = top;
+      top = top + step;
+    }
 
     for (int i = 0; i < NUM_CELLS; ++i) {
       Serial.print(shadow[i].cell->getRingIndex());
@@ -915,9 +927,9 @@ for(int j =0; j < NHISTOGRAMS; ++j){
     for (int i = 10; i >= 0; --i) {
       int h_count = histograms[i];
       count += h_count;
-      float t = min + (step * (i+1));
+      float t = min + (step * (i + 1));
       w_sum += t * h_count;
-      if (count > 5) {
+      if (count > REQUIRED_COUNT) {
         break;
       }
     }
@@ -943,12 +955,14 @@ for(int j =0; j < NHISTOGRAMS; ++j){
     }
     for (int i = 0; i < NUM_CELLS; i++) {
       g_Cells[i]->setIRMax(total_ir[i] / 4);
-      if(i == 12) {
-         Serial.println("Max index 12: ");
-         Serial.println(total_ir[i] / 4); }
-      if(i == 10) {
-         Serial.println("Max index 10: ");
-         Serial.println(total_ir[i] / 4); }
+      if (i == 12) {
+        Serial.println("Max index 12: ");
+        Serial.println(total_ir[i] / 4);
+      }
+      if (i == 10) {
+        Serial.println("Max index 10: ");
+        Serial.println(total_ir[i] / 4);
+      }
       g_Cells[i]->setIRMin(140);
     }
   }
