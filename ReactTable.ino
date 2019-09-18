@@ -850,9 +850,11 @@ void calibrate_iterative() {
   for (int i = 0; i < NUM_CELLS; i++) {
     shadow[i].cell = g_Cells[i];
     shadow[i].raw_ir = g_Cells[i]->rawIR();
+    /*
     Serial.print(shadow[i].cell->getRingIndex());
     Serial.print("\t");
     Serial.println(shadow[i].raw_ir);
+    */
   }
 
   // order by most intense
@@ -890,7 +892,10 @@ void calibrate_iterative() {
       return current < limit;
     }; // Generally upper edge is not inclusive
     auto less_than_equal_to = [](const float &current, const float &limit) {
-      return current <= limit;
+      auto curr = float_to_fixed(current);
+      auto lim =
+          float_to_fixed(limit) + 1; // floating point representation not good.
+      return curr <= lim;
     }; // On last bin edge, include those on boundary!
     typedef bool (*Top_Rule)(const float &, const float &);
     Top_Rule top_rule = less_than;
@@ -905,26 +910,34 @@ void calibrate_iterative() {
       }
 
       bottom = top;
-      top = top + step;
+      top += step;
     }
 
+    /*
     for (int i = 0; i < NUM_CELLS; ++i) {
       Serial.print(shadow[i].cell->getRingIndex());
       Serial.print("\t");
       Serial.println(shadow[i].raw_ir);
     }
+    */
 
-    for (int i = 0; i < 11; ++i) {
+    Serial.print("Min: ");
+    Serial.println(min);
+    Serial.print("Max: ");
+    Serial.println(max);
+    for (int i = 0; i < NHISTOGRAMS; ++i) {
       Serial.print(i);
       Serial.print("\t");
       Serial.print(min + (step * i));
+      Serial.print("-");
+      Serial.print(min + (step * (i + 1)));
       Serial.print("\t");
       Serial.println(histograms[i]);
     }
 
     int count = 0;
     float w_sum = 0;
-    for (int i = 10; i >= 0; --i) {
+    for (int i = NHISTOGRAMS - 1; i >= 0; --i) {
       int h_count = histograms[i];
       count += h_count;
       float t = min + (step * (i + 1));
@@ -942,27 +955,13 @@ void calibrate_iterative() {
       g_Cells[i]->setIRMin(140);
     }
   } else {
-    uint16_t total_ir[NUM_CELLS];
-    for (int i = 0; i < NUM_CELLS; i++)
-      total_ir[i] = 0;
-
-    for (int rounds = 0; rounds < 4; rounds++) {
-      for (int i = 0; i < NUM_CELLS; i++) {
-        uint16_t raw = g_Cells[i]->rawIR();
-        total_ir[i] += raw;
-      }
-      delay(10);
+    float average_ir = 0;
+    for (int i = 0; i < NUM_CELLS; ++i) {
+      average_ir += shadow[i].raw_ir;
     }
-    for (int i = 0; i < NUM_CELLS; i++) {
-      g_Cells[i]->setIRMax(total_ir[i] / 4);
-      if (i == 12) {
-        Serial.println("Max index 12: ");
-        Serial.println(total_ir[i] / 4);
-      }
-      if (i == 10) {
-        Serial.println("Max index 10: ");
-        Serial.println(total_ir[i] / 4);
-      }
+    average_ir /= NUM_CELLS;
+    for (int i = 0; i < NUM_CELLS; ++i) {
+      g_Cells[i]->setIRMax(average_ir);
       g_Cells[i]->setIRMin(140);
     }
   }
@@ -1059,7 +1058,7 @@ uint32_t g_total_time = 0;
 uint32_t g_frame_count = 0;
 
 void loop() {
-  if (g_frame_count % 400 == 0) {
+  if (g_frame_count % 100 == 0) {
     calibrate_iterative();
   }
   uint32_t start = millis();
