@@ -991,6 +991,7 @@ uint32_t last_change = 0;
 void setup() {
   // -- Set up the pins
 
+  
   pinMode(LED_PIN_1, OUTPUT);
   pinMode(LED_PIN_2, OUTPUT);
   pinMode(LED_PIN_3, OUTPUT);
@@ -1022,6 +1023,12 @@ void setup() {
   FastLED.setBrightness(g_Brightness);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 4000); // 4 Amp PSU limit
 
+  pinMode(32, OUTPUT);
+  digitalWrite(32, HIGH); 
+  for(uint8_t i = 0; i < 20; ++i){
+  fill_solid(g_LEDs, NUM_LEDS, CRGB::Black);
+  FastLED.show();
+  }
   fill_solid(g_LEDs, NUM_LEDS, CRGB::Yellow);
   FastLED.show();
   delay(1000);
@@ -1082,15 +1089,6 @@ void loop() {
   g_total_time += (end - start);
   g_frame_count++;
 
-  /** Just for testing: compute the time to render a frame
-  if (g_frame_count == 40) {
-      float fps = ((float) g_total_time) / ((float) g_frame_count);
-      Serial.print("ms per frame: ");
-      Serial.println(fps);
-      g_frame_count = 0;
-      g_total_time = 0;
-  }
-  */
 
   delay(1000 / FRAMES_PER_SECOND);
 }
