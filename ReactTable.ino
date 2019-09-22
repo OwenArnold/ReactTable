@@ -829,11 +829,6 @@ void calibrate() {
   }
 }
 
-int comparitor(const void *a, const void *b) {
-  const Cell *aCell = static_cast<const Cell *>(a);
-  const Cell *bCell = static_cast<const Cell *>(b);
-  return aCell->getLastIR() - bCell->getLastIR();
-}
 
 struct Sortable {
   Cell *cell;
@@ -844,32 +839,24 @@ struct Sortable {
   }
 };
 
+int comparitor(const void *a, const void *b) {
+  const Sortable *aCell = static_cast<const Sortable *>(a);
+  const Sortable *bCell = static_cast<const Sortable *>(b);
+  return aCell->raw_ir - bCell->raw_ir;
+}
+
+
 void calibrate_iterative() {
 
   Sortable shadow[NUM_CELLS];
   for (int i = 0; i < NUM_CELLS; i++) {
     shadow[i].cell = g_Cells[i];
     shadow[i].raw_ir = g_Cells[i]->rawIR();
-    /*
-    Serial.print(shadow[i].cell->getRingIndex());
-    Serial.print("\t");
-    Serial.println(shadow[i].raw_ir);
-    */
   }
 
   // order by most intense
-  // qsort(shadow, NUM_CELLS, sizeof(Cell), comparitor);
-
-  for (int i = 0; i < NUM_CELLS; i++) {
-    for (int j = i + 1; j < NUM_CELLS; j++) {
-      Sortable current = shadow[i];
-      Sortable other = shadow[j];
-      if (current.raw_ir > other.raw_ir) {
-        shadow[i] = other;
-        shadow[j] = current;
-      }
-    }
-  }
+  //
+  qsort(shadow, NUM_CELLS, sizeof(Sortable), comparitor);
 
   float min = shadow[0].raw_ir;
   float max = shadow[NUM_CELLS - 1].raw_ir;
@@ -878,7 +865,7 @@ void calibrate_iterative() {
   const static uint8_t REQUIRED_COUNT =
       5; // How many detectors must be used to calculate background
   if (min < max) {
-    float step = (max - min) / 10;
+    float step = (max - min) / NHISTOGRAMS;
     float histograms[NHISTOGRAMS];
     for (auto i = 0; i < NHISTOGRAMS; ++i) {
       histograms[i] = 0;
@@ -892,10 +879,7 @@ void calibrate_iterative() {
       return current < limit;
     }; // Generally upper edge is not inclusive
     auto less_than_equal_to = [](const float &current, const float &limit) {
-      auto curr = float_to_fixed(current);
-      auto lim =
-          float_to_fixed(limit) + 1; // floating point representation not good.
-      return curr <= lim;
+      return true; // Because items are sorted ascending, the last bin must contain everything else.
     }; // On last bin edge, include those on boundary!
     typedef bool (*Top_Rule)(const float &, const float &);
     Top_Rule top_rule = less_than;
@@ -904,7 +888,7 @@ void calibrate_iterative() {
       if (j == NHISTOGRAMS - 1) {
         top_rule = less_than_equal_to;
       }
-      while (current >= bottom && top_rule(current, top) && i <= NUM_CELLS) {
+      while (top_rule(current, top) && i <= NUM_CELLS) {
         current = shadow[i++].raw_ir;
         histograms[j] += 1;
       }
