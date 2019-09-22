@@ -798,38 +798,6 @@ void ParticleSurface() {}
 
 // === Main logic ===========================================================
 
-/** Calibrate the IR sensors
- *
- *  Read four values from each sensor, separated by 100ms. Take the
- *  average to be the max, which is used in Cell::senseIR to map all
- *  IR readings to a canonical range.
- */
-void calibrate() {
-
-  uint16_t total_ir[NUM_CELLS];
-
-  for (int i = 0; i < NUM_CELLS; i++)
-    total_ir[i] = 0;
-
-  for (int rounds = 0; rounds < 4; rounds++) {
-    for (int i = 0; i < NUM_CELLS; i++) {
-      uint16_t raw = g_Cells[i]->rawIR();
-      total_ir[i] += raw;
-    }
-    delay(100);
-  }
-
-  for (int i = 0; i < NUM_CELLS; i++) {
-    g_Cells[i]->setIRMax(total_ir[i] / 4);
-    g_Cells[i]->setIRMin(140);
-    CRGB gr = CRGB::Green;
-    g_Cells[i]->setAllLEDs(gr);
-    FastLED.show();
-    delay(10);
-  }
-}
-
-
 struct Sortable {
   Cell *cell;
   uint16_t raw_ir;
@@ -844,7 +812,6 @@ int comparitor(const void *a, const void *b) {
   const Sortable *bCell = static_cast<const Sortable *>(b);
   return aCell->raw_ir - bCell->raw_ir;
 }
-
 
 void calibrate_iterative() {
 
@@ -861,9 +828,9 @@ void calibrate_iterative() {
   float min = shadow[0].raw_ir;
   float max = shadow[NUM_CELLS - 1].raw_ir;
   const static uint8_t NHISTOGRAMS =
-      10; // How many steps made between min and max readings
+      20; // How many steps made between min and max readings
   const static uint8_t REQUIRED_COUNT =
-      5; // How many detectors must be used to calculate background
+      4; // How many detectors must be used to calculate background
   if (min < max) {
     float step = (max - min) / NHISTOGRAMS;
     float histograms[NHISTOGRAMS];
@@ -871,7 +838,6 @@ void calibrate_iterative() {
       histograms[i] = 0;
     }
 
-    float bottom = min;
     float top = min + step;
     int i = 0;
     float current = shadow[i++].raw_ir;
@@ -879,8 +845,9 @@ void calibrate_iterative() {
       return current < limit;
     }; // Generally upper edge is not inclusive
     auto less_than_equal_to = [](const float &current, const float &limit) {
-      return true; // Because items are sorted ascending, the last bin must contain everything else.
-    }; // On last bin edge, include those on boundary!
+      return true; // Because items are sorted ascending, the last bin must
+                   // contain everything else.
+    };             // On last bin edge, include those on boundary!
     typedef bool (*Top_Rule)(const float &, const float &);
     Top_Rule top_rule = less_than;
 
@@ -892,18 +859,8 @@ void calibrate_iterative() {
         current = shadow[i++].raw_ir;
         histograms[j] += 1;
       }
-
-      bottom = top;
       top += step;
     }
-
-    /*
-    for (int i = 0; i < NUM_CELLS; ++i) {
-      Serial.print(shadow[i].cell->getRingIndex());
-      Serial.print("\t");
-      Serial.println(shadow[i].raw_ir);
-    }
-    */
 
     Serial.print("Min: ");
     Serial.println(min);
@@ -969,7 +926,6 @@ void initialize() {
   }
 
   // -- Calibrate the IR sensors
-  calibrate();
 
   // -- Initialize the surface view
   // initializeSurface();
@@ -991,7 +947,6 @@ uint32_t last_change = 0;
 void setup() {
   // -- Set up the pins
 
-  
   pinMode(LED_PIN_1, OUTPUT);
   pinMode(LED_PIN_2, OUTPUT);
   pinMode(LED_PIN_3, OUTPUT);
@@ -1024,14 +979,11 @@ void setup() {
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 4000); // 4 Amp PSU limit
 
   pinMode(32, OUTPUT);
-  digitalWrite(32, HIGH); 
-  for(uint8_t i = 0; i < 20; ++i){
-  fill_solid(g_LEDs, NUM_LEDS, CRGB::Black);
-  FastLED.show();
+  digitalWrite(32, HIGH);
+  for (uint8_t i = 0; i < 20; ++i) {
+    fill_solid(g_LEDs, NUM_LEDS, CRGB::Black);
+    FastLED.show();
   }
-  fill_solid(g_LEDs, NUM_LEDS, CRGB::Yellow);
-  FastLED.show();
-  delay(1000);
 
   initialize();
   delay(500);
@@ -1088,7 +1040,6 @@ void loop() {
   uint32_t end = millis();
   g_total_time += (end - start);
   g_frame_count++;
-
 
   delay(1000 / FRAMES_PER_SECOND);
 }
