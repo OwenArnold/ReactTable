@@ -6,10 +6,10 @@
  *  This code supports four different animations. You can choose one of them,
  *  or set "cycle" to true to cycle through all of them at some set interval.
  */
-enum Mode { SolidMode, ConfettiMode, GearMode, FireMode };
+enum Mode { SolidMode, ConfettiMode, GearMode, FireMode, GearModeGame1 };
 
 // -- Mode choice
-Mode g_Mode = GearMode;
+Mode g_Mode = GearModeGame1;
 
 // -- To cycle modes, set cycle to true and choose an interval (in milliseconds)
 bool g_Cycle = false;
@@ -512,6 +512,7 @@ public:
 
     setAllLEDs(CRGB::Black); // fadeToBlackBy(80);
     uint8_t level = senseIRwithDecay(12, 4);
+
     int speed = map(level, 0, 255, max_speed, min_speed);
     m_position += speed;
     if (level > 230)
@@ -519,6 +520,29 @@ public:
     setPixelHue(m_position, level);
     setPixelHue(m_position + 0x5555, level);
     setPixelHue(m_position + 0xAAAA, level);
+  }
+
+  bool GearPatternGame1(int min_speed, int max_speed, bool is_on = false) {
+    // -- Initialize if necessary
+    if (m_new_pattern) {
+      m_position = random16();
+      m_palette = ForestColors_p;
+      m_new_pattern = false;
+    }
+
+    setAllLEDs(CRGB::Black); // fadeToBlackBy(80);
+    uint8_t level = senseIRwithDecay(12, 4);
+
+    if (is_on) {
+      int speed = map(level, 0, 255, max_speed, min_speed);
+      m_position += speed;
+      if (level > 230)
+        level = 230;
+      setPixelHue(m_position, level);
+      setPixelHue(m_position + 0x5555, level);
+      setPixelHue(m_position + 0xAAAA, level);
+    }
+    return level < 200; // triggered
   }
 
   void FirePattern(int sparking, int burn_rate) {
@@ -1000,6 +1024,8 @@ void setup() {
 uint32_t g_total_time = 0;
 uint32_t g_frame_count = 0;
 
+static uint8_t game_cell = random8(NUM_CELLS);
+
 void loop() {
   if (g_frame_count % 100 == 0) {
     calibrate_iterative();
@@ -1015,6 +1041,13 @@ void loop() {
       g_Cells[i]->ConfettiPattern();
     if (g_Mode == GearMode)
       g_Cells[i]->GearPattern(400, 8000);
+    if (g_Mode == GearModeGame1) {
+      bool triggered = g_Cells[i]->GearPatternGame1(400, 8000, i == game_cell);
+      if (triggered && i == game_cell) {
+        game_cell = random8(NUM_CELLS);
+        g_Cells[i]->setAllLEDs(CRGB::Black);
+      }
+    }
     if (g_Mode == FireMode)
       g_Cells[i]->FirePattern(30, 50);
     // if (g_Mode == SurfaceMode)  g_Cells[i]->SurfacePattern();
