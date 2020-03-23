@@ -529,8 +529,7 @@ public:
       m_palette = ForestColors_p;
       m_new_pattern = false;
     }
-
-    setAllLEDs(CRGB::Black); // fadeToBlackBy(80);
+    setAllLEDs(CRGB::Black);
     uint8_t level = senseIRwithDecay(12, 4);
 
     if (is_on) {
@@ -542,7 +541,11 @@ public:
       setPixelHue(m_position + 0x5555, level);
       setPixelHue(m_position + 0xAAAA, level);
     }
-    return level < 200; // triggered
+    const bool triggered = is_on && level < 200;
+    if (!is_on || triggered) {
+      setAllLEDs(CRGB::Black);
+    }
+    return triggered;
   }
 
   void FirePattern(int sparking, int burn_rate) {
@@ -1043,10 +1046,8 @@ void loop() {
       g_Cells[i]->GearPattern(400, 8000);
     if (g_Mode == GearModeGame1) {
       bool triggered = g_Cells[i]->GearPatternGame1(400, 8000, i == game_cell);
-      if (triggered && i == game_cell) {
+      if (triggered)
         game_cell = random8(NUM_CELLS);
-        g_Cells[i]->setAllLEDs(CRGB::Black);
-      }
     }
     if (g_Mode == FireMode)
       g_Cells[i]->FirePattern(30, 50);
