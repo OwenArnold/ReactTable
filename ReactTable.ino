@@ -6,10 +6,10 @@
  *  This code supports four different animations. You can choose one of them,
  *  or set "cycle" to true to cycle through all of them at some set interval.
  */
-enum Mode { SolidMode, ConfettiMode, GearMode, FireMode, GearModeGame1 };
+enum Mode { SolidMode, ConfettiMode, GearMode, FireMode, ByeWorm };
 
 // -- Mode choice
-Mode g_Mode = GearModeGame1;
+Mode g_Mode = ByeWorm;
 
 // -- To cycle modes, set cycle to true and choose an interval (in milliseconds)
 bool g_Cycle = false;
@@ -522,26 +522,28 @@ public:
     setPixelHue(m_position + 0xAAAA, level);
   }
 
-  bool GearPatternGame1(int min_speed, int max_speed, bool is_on = false) {
+  bool ByeWormGame(bool is_on = false) {
     // -- Initialize if necessary
     if (m_new_pattern) {
-      m_position = random16();
       m_palette = ForestColors_p;
       m_new_pattern = false;
     }
     setAllLEDs(CRGB::Black);
     uint8_t level = senseIRwithDecay(12, 4);
-
+    const uint8_t trigger_level = 130;
     if (is_on) {
-      int speed = map(level, 0, 255, max_speed, min_speed);
-      m_position += speed;
       if (level > 230)
         level = 230;
-      setPixelHue(m_position, level);
-      setPixelHue(m_position + 0x5555, level);
-      setPixelHue(m_position + 0xAAAA, level);
+
+      // Make ring behave like a guage
+      uint16_t pos = map(level, trigger_level, 255, 0,
+                         1 << 16); // pixels addressed 0 - 2^16
+      uint16_t increment = pos / NUM_LEDS;
+      for (uint16_t j = 0; j < pos; j += increment) {
+        setPixelHue(j, level);
+      }
     }
-    const bool triggered = is_on && level < 200;
+    const bool triggered = is_on && level < trigger_level;
     if (!is_on || triggered) {
       setAllLEDs(CRGB::Black);
     }
@@ -1044,8 +1046,8 @@ void loop() {
       g_Cells[i]->ConfettiPattern();
     if (g_Mode == GearMode)
       g_Cells[i]->GearPattern(400, 8000);
-    if (g_Mode == GearModeGame1) {
-      bool triggered = g_Cells[i]->GearPatternGame1(400, 8000, i == game_cell);
+    if (g_Mode == ByeWorm) {
+      bool triggered = g_Cells[i]->ByeWormGame(i == game_cell);
       if (triggered)
         game_cell = random8(NUM_CELLS);
     }
