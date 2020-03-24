@@ -292,6 +292,7 @@ public:
   uint16_t getIRMax() const { return m_ir_max; }
 
   void setIRMin(uint16_t ir_min) { m_ir_min = ir_min; }
+  uint16_t getIRMin() const { return m_ir_min; }
 
   /** Read raw IR value
    *  We can have several MUXs, each with 16 channels. To read a specific
@@ -331,7 +332,9 @@ public:
         count++;
       }
     }
+
     // -- Map to 8-bit value
+
     return float_to_fixed(additional / count);
   }
 
@@ -351,7 +354,8 @@ public:
     uint8_t level = map(val, m_ir_min, m_ir_max, 0, 255);
 
     m_last_ir = level; // Record the current level
-    return level - senseBoost();
+    level -= senseBoost();
+    return level;
   }
 
   /** Sense IR with decay
@@ -530,7 +534,7 @@ public:
     }
     setAllLEDs(CRGB::Black);
     uint8_t level = senseIRwithDecay(12, 4);
-    const uint8_t trigger_level = 130;
+    const uint8_t trigger_level = (getIRMax() + getIRMin() * 2) / 3;
     if (is_on) {
       if (level > 230)
         level = 230;
