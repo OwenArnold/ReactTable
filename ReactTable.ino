@@ -525,7 +525,7 @@ public:
   bool ByeWormGame(bool is_on = false) {
     // -- Initialize if necessary
     if (m_new_pattern) {
-      m_palette = ForestColors_p;
+      m_palette = OceanColors_p;
       m_new_pattern = false;
     }
     setAllLEDs(CRGB::Black);
