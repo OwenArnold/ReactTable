@@ -526,30 +526,50 @@ public:
     setPixelHue(m_position + 0xAAAA, level);
   }
 
+  uint32_t m_cycle_count;
+
   bool ByeWormGame(bool is_on = false) {
     // -- Initialize if necessary
     if (m_new_pattern) {
       m_palette = OceanColors_p;
       m_new_pattern = false;
+      m_cycle_count = 0;
     }
     setAllLEDs(CRGB::Black);
     uint8_t level = senseIRwithDecay(12, 4);
     const uint8_t trigger_level = (getIRMax() + getIRMin() * 2) / 3;
     if (is_on) {
+
       if (level > 230)
         level = 230;
+      // Come catch me.
+      uint8_t duration_ts = 10 * m_cycle_count /
+                            FRAMES_PER_SECOND; // duration in tenths of second
+      if (duration_ts < 5) {
+        uint8_t offset = duration_ts % 2;
+        for (uint16_t i = 0; i < LEDS_PER_CELL; i += 2) {
+          g_LEDs[m_led_index + i + offset] = CRGB::LimeGreen;
+        }
 
-      // Make ring behave like a guage
-      uint16_t pos = map(level, trigger_level, 255, 0,
-                         1 << 16); // pixels addressed 0 - 2^16
-      uint16_t increment = pos / NUM_LEDS;
-      for (uint16_t j = 0; j < pos; j += increment) {
-        setPixelHue(j, level);
+      } else if (duration_ts < 10) {
+        // Flash
+        CRGB color = duration_ts % 2 == 0 ? CRGB::LimeGreen : CRGB::Black;
+        setAllLEDs(color);
+      } else {
+        // Make ring behave like a guage
+        uint16_t pos = map(level, trigger_level, 230 + 1, 0,
+                           1 << 16); // pixels addressed 0 - 2^16
+        uint16_t increment = pos / NUM_LEDS;
+        for (uint16_t j = 0; j < pos; j += increment) {
+          setPixelHue(j, level);
+        }
       }
+      ++m_cycle_count;
     }
     const bool triggered = is_on && level < trigger_level;
     if (!is_on || triggered) {
       setAllLEDs(CRGB::Black);
+      m_cycle_count = 0;
     }
     return triggered;
   }
